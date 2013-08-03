@@ -8,6 +8,11 @@ from .mysqlexecutor import MySqlDialect
 from .results import ResultTable, Result
 
 
+def prepare(name):
+    dialect = _dialects[name]()
+    dialect.prepare()
+    
+
 def executor(name):
     dialect = _dialects[name]()
     server = dialect.start_server()

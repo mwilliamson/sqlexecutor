@@ -20,7 +20,6 @@ class MySqlDialect(object):
         return error[1]
     
     def start_server(self):
-        mysql_install_path = self._download_mysql()
         temp_dir = create_temporary_dir()
         try:
             socket_path = os.path.join(temp_dir.path, "mysql.sock")
@@ -29,11 +28,11 @@ class MySqlDialect(object):
             pid_file = os.path.join(temp_dir.path, "mysql.pid")
             mysqld_args = self._mysqld_args(data_dir, pid_file, socket_path, port)
             
-            self._create_data_dir(mysql_install_path, data_dir)
+            self._create_data_dir(data_dir)
             
             mysql_process = _local.spawn(
                 ["bin/mysqld"] + mysqld_args,
-                cwd=mysql_install_path,
+                cwd=self._mysql_install_dir(),
                 store_pid=True,
                 allow_error=True,
             )
@@ -67,20 +66,12 @@ class MySqlDialect(object):
             server.close()
             raise
     
-    def _create_data_dir(self, install_dir, data_dir):
-        data_dir_template = os.path.join(self._downloads_dir(), "data")
-        if not os.path.exists(data_dir_template):
-            _local.run(
-                [
-                    "scripts/mysql_install_db", 
-                    "--no-defaults",
-                    "--basedir=.",
-                    "--datadir={0}".format(data_dir_template),
-                ],
-                cwd=install_dir,
-            )
-        
-        _local.run(["cp", "-rT", data_dir_template, data_dir])
+    def prepare(self):
+        self._download_mysql()
+        self._create_data_dir_template()
+    
+    def _create_data_dir(self, data_dir):
+        _local.run(["cp", "-rT", self._data_dir_template(), data_dir])
     
     def _mysqld_args(self, data_dir, pid_file, socket_path, port):
         return [
@@ -91,10 +82,22 @@ class MySqlDialect(object):
             "--socket={0}".format(socket_path),
             "--pid-file={0}".format(pid_file),
         ]
-        
+    
+    def _create_data_dir_template(self):
+        data_dir_template = self._data_dir_template()
+        if not os.path.exists(data_dir_template):
+            _local.run(
+                [
+                    "scripts/mysql_install_db", 
+                    "--no-defaults",
+                    "--basedir=.",
+                    "--datadir={0}".format(data_dir_template),
+                ],
+                cwd=self._mysql_install_dir(),
+            )
     
     def _download_mysql(self):
-        install_dir = os.path.join(self._downloads_dir(), "mysql-5.6.13")
+        install_dir = self._mysql_install_dir()
         if not os.path.exists(install_dir):
             os.makedirs(install_dir)
             url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
@@ -104,18 +107,22 @@ class MySqlDialect(object):
         return install_dir
     
     def _download(self, name, url):
-        with create_temporary_dir() as mysql_install_dir:
-            # TODO: concurrent access
-            tarball_path = os.path.join(self._downloads_dir(), name)
-            if not os.path.exists(os.path.dirname(tarball_path)):
-                os.makedirs(os.path.dirname(tarball_path))
+        tarball_path = os.path.join(self._downloads_dir(), name)
+        if not os.path.exists(os.path.dirname(tarball_path)):
+            os.makedirs(os.path.dirname(tarball_path))
+        
+        # TODO: check hash
+        if not os.path.exists(tarball_path):
+            subprocess.check_call(["curl", url, "--output", tarball_path, "--location", "--fail"])
             
-            # TODO: check hash
-            if not os.path.exists(tarball_path):
-                subprocess.check_call(["curl", url, "--output", tarball_path, "--location", "--fail"])
-                
-            return tarball_path
-            
+        return tarball_path
+    
+    def _data_dir_template(self):
+        return os.path.join(self._downloads_dir(), "data")
+    
+    def _mysql_install_dir(self):
+        return os.path.join(self._downloads_dir(), "mysql-5.6.13")
+    
     def _downloads_dir(self):
         return os.path.join(os.path.dirname(__file__), "downloads")
 

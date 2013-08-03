@@ -7,6 +7,7 @@ import sqlexecutor
 class MySqlTests(object):
     @classmethod
     def setup_class(cls):
+        sqlexecutor.prepare("mysql")
         cls._executor = sqlexecutor.executor("mysql")
     
     @classmethod    
