@@ -2,6 +2,7 @@ import os
 import contextlib
 import subprocess
 import time
+import uuid
 
 import MySQLdb
 import spur
@@ -18,7 +19,11 @@ class MySqlDialect(object):
     @contextlib.contextmanager
     def connect(self):
         with self._install_mysql() as mysql_server:
-            yield mysql_server.connect()
+            connection = mysql_server.connect()
+            try:
+                yield connection
+            finally:
+                connection.close()
 
     def error_message(self, error):
         return error[1]
@@ -60,9 +65,19 @@ class MySqlDialect(object):
                 allow_error=True,
             )
             try:
-                server = MySqlServer(socket_path=socket_path)
-                _retry(server.connect, MySQLdb.MySQLError, timeout=10, interval=0.2)
-                yield server
+                server = MySqlServer(socket_path=socket_path, root_password="")
+                connection = _retry(
+                    lambda: server.connect_as_root(),
+                    MySQLdb.MySQLError,
+                    timeout=10, interval=0.2
+                )
+                try:
+                    root_password = str(uuid.uuid4())
+                    cursor = connection.cursor()
+                    cursor.execute("SET PASSWORD = PASSWORD(%s)", (root_password,))
+                finally:
+                    connection.close()
+                yield MySqlServer(socket_path=socket_path, root_password=root_password)
             finally:
                 mysql_process.send_signal(15)
                 mysql_process.wait_for_result()
@@ -82,11 +97,24 @@ class MySqlDialect(object):
 
 
 class MySqlServer(object):
-    def __init__(self, socket_path):
+    def __init__(self, socket_path, root_password):
         self._socket_path = socket_path
+        self._root_password = root_password
 
     def connect(self):
-        return MySQLdb.connect(host="localhost", user="root", passwd="", db="test", unix_socket=self._socket_path)
+        return self.connect_as_root()
+
+    def connect_as_root(self):
+        return self._connect_as_user("root", self._root_password)
+
+    def _connect_as_user(self, username, password):
+        return MySQLdb.connect(
+            host="localhost",
+            user=username,
+            passwd=self._root_password,
+            db="test",
+            unix_socket=self._socket_path
+        )
 
 
 def _retry(func, error_cls, timeout, interval):
