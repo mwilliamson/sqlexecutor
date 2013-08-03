@@ -1,6 +1,7 @@
 import os
 import contextlib
 import subprocess
+import time
 
 import MySQLdb
 import spur
@@ -17,9 +18,8 @@ class MySqlDialect(object):
     @contextlib.contextmanager
     def connect(self):
         with self._install_mysql() as mysql_server:
-            yield MySQLdb.connect(host="localhost", user="root", passwd="", db="test", unix_socket=mysql_server.socket_path)
+            yield mysql_server.connect()
 
-        
     def error_message(self, error):
         return error[1]
     
@@ -60,13 +60,13 @@ class MySqlDialect(object):
                 allow_error=True,
             )
             try:
-                import time
-                time.sleep(5)
-                yield MySqlServer(socket_path=socket_path)
+                server = MySqlServer(socket_path=socket_path)
+                _retry(server.connect, MySQLdb.MySQLError, timeout=10, interval=0.2)
+                yield server
             finally:
                 mysql_process.send_signal(15)
                 mysql_process.wait_for_result()
-            
+                
     def _download(self, name, url):
         with create_temporary_dir() as mysql_install_dir:
             # TODO: concurrent access
@@ -83,4 +83,19 @@ class MySqlDialect(object):
 
 class MySqlServer(object):
     def __init__(self, socket_path):
-        self.socket_path = socket_path
+        self._socket_path = socket_path
+
+    def connect(self):
+        return MySQLdb.connect(host="localhost", user="root", passwd="", db="test", unix_socket=self._socket_path)
+
+
+def _retry(func, error_cls, timeout, interval):
+    start_time = time.time()
+    while True:
+        try:
+            return func()
+        except error_cls as error:
+            if time.time() - start_time > timeout:
+                raise
+            else:
+                time.sleep(interval)
