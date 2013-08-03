@@ -25,12 +25,11 @@ class MySqlDialect(object):
         try:
             socket_path = os.path.join(temp_dir.path, "mysql.sock")
             port = 55555
-            mysqld_args = self._mysqld_args(temp_dir.path, socket_path, port)
+            data_dir = os.path.join(temp_dir.path, "data")
+            pid_file = os.path.join(temp_dir.path, "mysql.pid")
+            mysqld_args = self._mysqld_args(data_dir, pid_file, socket_path, port)
             
-            _local.run(
-                ["scripts/mysql_install_db"] + mysqld_args,
-                cwd=mysql_install_path,
-            )
+            self._create_data_dir(mysql_install_path, data_dir)
             
             mysql_process = _local.spawn(
                 ["bin/mysqld"] + mysqld_args,
@@ -68,9 +67,22 @@ class MySqlDialect(object):
             server.close()
             raise
     
-    def _mysqld_args(self, temp_path, socket_path, port):
-        data_dir = os.path.join(temp_path, "data")
-        pid_file = os.path.join(temp_path, "mysql.pid")
+    def _create_data_dir(self, install_dir, data_dir):
+        data_dir_template = os.path.join(self._downloads_dir(), "data")
+        if not os.path.exists(data_dir_template):
+            _local.run(
+                [
+                    "scripts/mysql_install_db", 
+                    "--no-defaults",
+                    "--basedir=.",
+                    "--datadir={0}".format(data_dir_template),
+                ],
+                cwd=install_dir,
+            )
+        
+        _local.run(["cp", "-rT", data_dir_template, data_dir])
+    
+    def _mysqld_args(self, data_dir, pid_file, socket_path, port):
         return [
             "--no-defaults",
             "--basedir=.",
