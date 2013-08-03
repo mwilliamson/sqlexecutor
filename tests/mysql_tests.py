@@ -1,18 +1,31 @@
+import os
+
 from nose.tools import istest, assert_equal, assert_regexp_matches
 
 import sqlexecutor
+from sqlexecutor import tempdir
 
 
 @istest
 class MySqlTests(object):
     @classmethod
     def setup_class(cls):
-        sqlexecutor.prepare("mysql")
-        cls._executor = sqlexecutor.executor("mysql")
+        if os.environ.get("FULL_TEST", False):
+            cls._working_dir = tempdir.create_temporary_dir()
+            working_dir_path = cls._working_dir.path
+        else:
+            cls._working_dir = None
+            working_dir_path = os.path.join(os.path.dirname(__file__), "_working_dir")
+        sqlexecutor.prepare("mysql", working_dir=working_dir_path)
+        cls._executor = sqlexecutor.executor("mysql", working_dir=working_dir_path)
     
     @classmethod    
     def teardown_class(cls):
-        cls._executor.close()
+        try:
+            cls._executor.close()
+        finally:
+            if cls._working_dir is not None:
+                cls._working_dir.close()
     
     @istest
     def original_query_is_included_in_result(self):

@@ -16,6 +16,9 @@ _local = spur.LocalShell()
 class MySqlDialect(object):
     DatabaseError = MySQLdb.MySQLError
     
+    def __init__(self, working_dir):
+        self._working_dir = working_dir
+    
     def error_message(self, error):
         return error[1]
     
@@ -124,7 +127,7 @@ class MySqlDialect(object):
         return os.path.join(self._downloads_dir(), "mysql-5.6.13")
     
     def _downloads_dir(self):
-        return os.path.join(os.path.dirname(__file__), "downloads")
+        return self._working_dir
 
 
 class MySqlServer(object):

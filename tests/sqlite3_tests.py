@@ -5,7 +5,7 @@ import sqlexecutor
 
 @istest
 def original_query_is_included_in_result():
-    result = sqlexecutor.executor("sqlite3").execute(
+    result = sqlexecutor.executor("sqlite3", working_dir=None).execute(
         "",
         "SELECT 1"
     )
@@ -14,7 +14,7 @@ def original_query_is_included_in_result():
 
 @istest
 def running_sqlite3_query_returns_result_with_column_names_and_rows():
-    result = sqlexecutor.executor("sqlite3").execute(
+    result = sqlexecutor.executor("sqlite3", working_dir=None).execute(
         [
             """create table books (
                 title,
@@ -44,7 +44,7 @@ def running_sqlite3_query_returns_result_with_column_names_and_rows():
 
 @istest
 def query_results_in_error_if_query_is_empty():
-    result = sqlexecutor.executor("sqlite3").execute(
+    result = sqlexecutor.executor("sqlite3", working_dir=None).execute(
         "",
         ""
     )
@@ -54,7 +54,7 @@ def query_results_in_error_if_query_is_empty():
 
 @istest
 def query_results_in_error_if_query_is_malformed():
-    result = sqlexecutor.executor("sqlite3").execute(
+    result = sqlexecutor.executor("sqlite3", working_dir=None).execute(
         "",
         "SELECTEROO"
     )
@@ -64,7 +64,7 @@ def query_results_in_error_if_query_is_malformed():
 
 @istest
 def query_results_in_error_if_query_references_non_existant_table():
-    result = sqlexecutor.executor("sqlite3").execute(
+    result = sqlexecutor.executor("sqlite3", working_dir=None).execute(
         "",
         "SELECT 1 FROM books"
     )

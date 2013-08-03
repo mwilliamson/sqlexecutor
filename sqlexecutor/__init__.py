@@ -8,13 +8,13 @@ from .mysqlexecutor import MySqlDialect
 from .results import ResultTable, Result
 
 
-def prepare(name):
-    dialect = _dialects[name]()
+def prepare(name, working_dir):
+    dialect = _dialects[name](working_dir)
     dialect.prepare()
     
 
-def executor(name):
-    dialect = _dialects[name]()
+def executor(name, working_dir):
+    dialect = _dialects[name](working_dir)
     server = dialect.start_server()
     return QueryExecutor(dialect, server)
 
@@ -63,6 +63,9 @@ class QueryExecutor(object):
 
 class Sqlite3Dialect(object):
     DatabaseError = sqlite3.Error
+    
+    def __init__(self, working_dir):
+        pass
     
     def start_server(self):
         return Sqlite3Server()
