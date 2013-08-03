@@ -16,25 +16,19 @@ _local = spur.LocalShell()
 class MySqlDialect(object):
     DatabaseError = MySQLdb.MySQLError
     
-    @contextlib.contextmanager
-    def connect(self):
-        with self._install_mysql() as mysql_server:
-            connection = mysql_server.connect()
-            try:
-                yield connection
-            finally:
-                connection.close()
+    def start_server(self):
+        return self._install_mysql()
 
     def error_message(self, error):
         return error[1]
     
-    @contextlib.contextmanager
     def _install_mysql(self):
-        with create_temporary_dir() as temp_dir:
+        temp_dir = create_temporary_dir()
+        try:
             url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
             path = self._download("mysql-5.6.13", url)
-            _local.run(["tar", "xzf", path, "--directory", temp_dir])
-            mysql_install_path = os.path.join(temp_dir, "mysql-5.6.13-linux-glibc2.5-x86_64")
+            _local.run(["tar", "xzf", path, "--directory", temp_dir.path])
+            mysql_install_path = os.path.join(temp_dir.path, "mysql-5.6.13-linux-glibc2.5-x86_64")
             
             port = 55555
             socket_path = os.path.join(mysql_install_path, "mysql.sock")
@@ -64,8 +58,14 @@ class MySqlDialect(object):
                 store_pid=True,
                 allow_error=True,
             )
+            
+            server = MySqlServer(
+                process=mysql_process,
+                temp_dir=temp_dir,
+                socket_path=socket_path,
+                root_password=""
+            )
             try:
-                server = MySqlServer(socket_path=socket_path, root_password="")
                 connection = _retry(
                     lambda: server.connect_as_root(),
                     MySQLdb.MySQLError,
@@ -77,10 +77,16 @@ class MySqlDialect(object):
                     cursor.execute("SET PASSWORD = PASSWORD(%s)", (root_password,))
                 finally:
                     connection.close()
-                yield MySqlServer(socket_path=socket_path, root_password=root_password)
-            finally:
-                mysql_process.send_signal(15)
-                mysql_process.wait_for_result()
+                    
+                server._root_password = root_password
+                
+                return server
+            except:
+                server.close()
+                raise
+        except:
+            temp_dir.close()
+            raise
                 
     def _download(self, name, url):
         with create_temporary_dir() as mysql_install_dir:
@@ -97,7 +103,9 @@ class MySqlDialect(object):
 
 
 class MySqlServer(object):
-    def __init__(self, socket_path, root_password):
+    def __init__(self, process, temp_dir, socket_path, root_password):
+        self._process = process
+        self._temp_dir = temp_dir
         self._socket_path = socket_path
         self._root_password = root_password
 
@@ -115,6 +123,11 @@ class MySqlServer(object):
             db="test",
             unix_socket=self._socket_path
         )
+        
+    def close(self):
+        self._process.send_signal(15)
+        self._process.wait_for_result()
+        self._temp_dir.close()
 
 
 def _retry(func, error_cls, timeout, interval):

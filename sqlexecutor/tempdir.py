@@ -3,10 +3,20 @@ import tempfile
 import shutil
 
 
-@contextlib.contextmanager
 def create_temporary_dir():
     temporary_dir = tempfile.mkdtemp()
-    try:
-        yield temporary_dir
-    finally:
-        shutil.rmtree(temporary_dir)
+    return TemporaryDirectory(temporary_dir)
+
+
+class TemporaryDirectory(object):
+    def __init__(self, path):
+        self.path = path
+
+    def close(self):
+        shutil.rmtree(self.path)
+    
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, *args):
+        self.close()

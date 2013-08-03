@@ -9,18 +9,22 @@ from .results import ResultTable, Result
 
 
 def executor(name):
-    return QueryExecutor(_dialects[name]())
+    dialect = _dialects[name]()
+    server = dialect.start_server()
+    return QueryExecutor(dialect, server)
 
 
 class QueryExecutor(object):
-    def __init__(self, dialect):
+    def __init__(self, dialect, server):
         self._dialect = dialect
+        self._server = server
         
     def execute(self, creation_script, query):
         if not query:
             return Result(query=query, error="Query is empty", table=None)
             
-        with self._dialect.connect() as connection:
+        connection = self._server.connect()
+        try:
             cursor = connection.cursor()
             for statement in creation_script:
                 cursor.execute(statement)
@@ -45,17 +49,26 @@ class QueryExecutor(object):
                 error=None,
                 table=table,
             )
+        finally:
+            connection.close()
+            
+    def close(self):
+        self._server.close()
 
 
 class Sqlite3Dialect(object):
     DatabaseError = sqlite3.Error
     
-    @contextlib.contextmanager
-    def connect(self):
-        yield sqlite3.connect(":memory:")
+    def start_server(self):
+        return Sqlite3Server()
         
     def error_message(self, error):
         return error.message
+
+
+class Sqlite3Server(object):
+    def connect(self):
+        return sqlite3.connect(":memory:")
 
 
 _dialects = {
