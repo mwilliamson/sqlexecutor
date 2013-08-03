@@ -20,20 +20,20 @@ class MySqlDialect(object):
         return error[1]
     
     def start_server(self):
+        mysql_install_path = self._download_mysql()
         temp_dir = create_temporary_dir()
         try:
-            mysql_install_path = self._download_mysql_to_path(temp_dir.path)
-            
-            socket_path = os.path.join(mysql_install_path, "mysql.sock")
+            socket_path = os.path.join(temp_dir.path, "mysql.sock")
             port = 55555
+            mysqld_args = self._mysqld_args(temp_dir.path, socket_path, port)
             
             _local.run(
-                ["scripts/mysql_install_db"] + self._mysqld_args(socket_path, port),
+                ["scripts/mysql_install_db"] + mysqld_args,
                 cwd=mysql_install_path,
             )
             
             mysql_process = _local.spawn(
-                ["bin/mysqld"] + self._mysqld_args(socket_path, port),
+                ["bin/mysqld"] + mysqld_args,
                 cwd=mysql_install_path,
                 store_pid=True,
                 allow_error=True,
@@ -68,26 +68,33 @@ class MySqlDialect(object):
             server.close()
             raise
     
-    def _mysqld_args(self, socket_path, port):
+    def _mysqld_args(self, temp_path, socket_path, port):
+        data_dir = os.path.join(temp_path, "data")
+        pid_file = os.path.join(temp_path, "mysql.pid")
         return [
             "--no-defaults",
             "--basedir=.",
-            "--datadir=data",
+            "--datadir={0}".format(data_dir),
             "--port={0}".format(port),
             "--socket={0}".format(socket_path),
+            "--pid-file={0}".format(pid_file),
         ]
         
     
-    def _download_mysql_to_path(self, directory):
-        url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
-        path = self._download("mysql-5.6.13.tar.gz", url)
-        _local.run(["tar", "xzf", path, "--directory", directory])
-        return os.path.join(directory, "mysql-5.6.13-linux-glibc2.5-x86_64")
+    def _download_mysql(self):
+        install_dir = os.path.join(self._downloads_dir(), "mysql-5.6.13")
+        if not os.path.exists(install_dir):
+            os.makedirs(install_dir)
+            url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
+            path = self._download("mysql-5.6.13.tar.gz", url)
+            _local.run(["tar", "xzf", path, "--directory", install_dir, "--strip-components=1"])
+            _local.run(["chmod", "-R", "-w", install_dir])
+        return install_dir
     
     def _download(self, name, url):
         with create_temporary_dir() as mysql_install_dir:
             # TODO: concurrent access
-            tarball_path = os.path.join(os.path.dirname(__file__), "downloads", name)
+            tarball_path = os.path.join(self._downloads_dir(), name)
             if not os.path.exists(os.path.dirname(tarball_path)):
                 os.makedirs(os.path.dirname(tarball_path))
             
@@ -96,6 +103,9 @@ class MySqlDialect(object):
                 subprocess.check_call(["curl", url, "--output", tarball_path, "--location", "--fail"])
                 
             return tarball_path
+            
+    def _downloads_dir(self):
+        return os.path.join(os.path.dirname(__file__), "downloads")
 
 
 class MySqlServer(object):
