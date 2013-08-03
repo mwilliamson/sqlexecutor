@@ -15,22 +15,20 @@ def original_query_is_included_in_result():
 @istest
 def running_sqlite3_query_returns_result_with_column_names_and_rows():
     result = sqlexecutor.executor("sqlite3").execute(
-        """create table books (
-            title,
-            author
-        );
-        
-        insert into books (title, author) values (
-            'Dirk Gently''s Holistic Detective Agency',
-            'Douglas Adams'
-        );
-        
-        insert into books (title, author) values (
-            'Orbiting the Giant Hairball',
-            'Gordon MacKenzie'
-        );
-        
-        """,
+        [
+            """create table books (
+                title,
+                author
+            );""",
+            """insert into books (title, author) values (
+                'Dirk Gently''s Holistic Detective Agency',
+                'Douglas Adams'
+            );""",
+            """insert into books (title, author) values (
+                'Orbiting the Giant Hairball',
+                'Gordon MacKenzie'
+            );""",
+        ],
         "SELECT * FROM books"
     )
     assert_equal(None, result.error)

@@ -11,36 +11,17 @@ from .tempdir import create_temporary_dir
 
 _local = spur.LocalShell()
 
-class MySqlExecutor(object):
-    def execute(self, creation_script, query):
+class MySqlDialect(object):
+    DatabaseError = MySQLdb.MySQLError
+    
+    @contextlib.contextmanager
+    def connect(self):
         with self._install_mysql() as mysql_server:
-            if not query:
-                return Result(query=query, error="Query is empty", table=None)
-                
-            connection = MySQLdb.connect(host="localhost", user="root", passwd="", db="test", unix_socket=mysql_server.socket_path)
-            cursor = connection.cursor()
-            for statement in creation_script:
-                cursor.execute(statement)
-            
-            try:
-                cursor.execute(query)
-            except MySQLdb.MySQLError as error:
-                return Result(query=query, error=error[1], table=None)
-            
-            column_names = [
-                column[0]
-                for column in cursor.description
-            ]
-            
-            rows = map(list, cursor.fetchall())
-            
-            table = ResultTable(column_names, rows)
-            
-            return Result(
-                query=query,
-                error=None,
-                table=table,
-            )
+            yield MySQLdb.connect(host="localhost", user="root", passwd="", db="test", unix_socket=mysql_server.socket_path)
+
+        
+    def error_message(self, error):
+        return error[1]
     
     @contextlib.contextmanager
     def _install_mysql(self):
