@@ -1,0 +1,4 @@
+/README
+/_virtualenv
+/*.egg-info
+*.pyc
