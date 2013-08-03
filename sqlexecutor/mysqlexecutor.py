@@ -16,13 +16,10 @@ _local = spur.LocalShell()
 class MySqlDialect(object):
     DatabaseError = MySQLdb.MySQLError
     
-    def start_server(self):
-        return self._install_mysql()
-
     def error_message(self, error):
         return error[1]
     
-    def _install_mysql(self):
+    def start_server(self):
         temp_dir = create_temporary_dir()
         try:
             mysql_install_path = self._download_mysql_to_path(temp_dir.path)
