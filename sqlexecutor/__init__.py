@@ -69,6 +69,9 @@ class Sqlite3Dialect(object):
         
     def error_message(self, error):
         return error.message
+        
+    def prepare(self):
+        pass
 
 
 class Sqlite3Server(object):
