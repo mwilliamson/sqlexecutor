@@ -15,5 +15,7 @@ setup(
     url='http://github.com/mwilliamson/sqlexecutor',
     packages=['sqlexecutor'],
     install_requires=[
+        "spur.local>=0.3.5,<0.4",
+        "MySQL-python==1.2.4",
     ],
 )

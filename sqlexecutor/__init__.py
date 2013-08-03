@@ -3,9 +3,12 @@ __all__ = ["executor"]
 
 import sqlite3
 
+from .mysqlexecutor import MySqlExecutor
+from .results import ResultTable, Result
+
 
 def executor(name):
-    return Sqlite3Executor()
+    return _executors[name]()
     
     
 class Sqlite3Executor(object):
@@ -36,16 +39,9 @@ class Sqlite3Executor(object):
             error=None,
             table=table,
         )
-        
-        
-class Result(object):
-    def __init__(self, query, error, table):
-        self.query = query
-        self.error = error
-        self.table = table
 
 
-class ResultTable(object):
-    def __init__(self, column_names, rows):
-        self.column_names = column_names
-        self.rows = rows
+_executors = {
+    "sqlite3": Sqlite3Executor,
+    "mysql": MySqlExecutor,
+}

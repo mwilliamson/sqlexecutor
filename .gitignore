@@ -1,4 +1,5 @@
 /README
 /_virtualenv
 /*.egg-info
+/sqlexecutor/downloads
 *.pyc
