@@ -25,35 +25,18 @@ class MySqlDialect(object):
     def _install_mysql(self):
         temp_dir = create_temporary_dir()
         try:
-            url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
-            path = self._download("mysql-5.6.13", url)
-            _local.run(["tar", "xzf", path, "--directory", temp_dir.path])
-            mysql_install_path = os.path.join(temp_dir.path, "mysql-5.6.13-linux-glibc2.5-x86_64")
+            mysql_install_path = self._download_mysql_to_path(temp_dir.path)
             
-            port = 55555
             socket_path = os.path.join(mysql_install_path, "mysql.sock")
+            port = 55555
             
             _local.run(
-                [
-                    "scripts/mysql_install_db",
-                    "--no-defaults",
-                    "--basedir=.",
-                    "--datadir=data",
-                    "--port={0}".format(port),
-                    "--socket={0}".format(socket_path),
-                ],
+                ["scripts/mysql_install_db"] + self._mysqld_args(socket_path, port),
                 cwd=mysql_install_path,
             )
             
             mysql_process = _local.spawn(
-                [
-                    "bin/mysqld",
-                    "--no-defaults",
-                    "--basedir=.",
-                    "--datadir=data",
-                    "--port={0}".format(port),
-                    "--socket={0}".format(socket_path),
-                ],
+                ["bin/mysqld"] + self._mysqld_args(socket_path, port),
                 cwd=mysql_install_path,
                 store_pid=True,
                 allow_error=True,
@@ -63,7 +46,7 @@ class MySqlDialect(object):
                 process=mysql_process,
                 temp_dir=temp_dir,
                 socket_path=socket_path,
-                root_password=""
+                root_password="",
             )
             try:
                 connection = _retry(
@@ -87,7 +70,23 @@ class MySqlDialect(object):
         except:
             temp_dir.close()
             raise
-                
+    
+    def _mysqld_args(self, socket_path, port):
+        return [
+            "--no-defaults",
+            "--basedir=.",
+            "--datadir=data",
+            "--port={0}".format(port),
+            "--socket={0}".format(socket_path),
+        ]
+        
+    
+    def _download_mysql_to_path(self, directory):
+        url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
+        path = self._download("mysql-5.6.13", url)
+        _local.run(["tar", "xzf", path, "--directory", directory])
+        return os.path.join(directory, "mysql-5.6.13-linux-glibc2.5-x86_64")
+    
     def _download(self, name, url):
         with create_temporary_dir() as mysql_install_dir:
             # TODO: concurrent access
