@@ -80,7 +80,7 @@ class MySqlDialect(object):
     
     def _download_mysql_to_path(self, directory):
         url = "http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.13-linux-glibc2.5-x86_64.tar.gz/from/http://cdn.mysql.com/"
-        path = self._download("mysql-5.6.13", url)
+        path = self._download("mysql-5.6.13.tar.gz", url)
         _local.run(["tar", "xzf", path, "--directory", directory])
         return os.path.join(directory, "mysql-5.6.13-linux-glibc2.5-x86_64")
     
