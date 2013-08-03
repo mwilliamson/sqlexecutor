@@ -1,4 +1,4 @@
-from nose.tools import istest, assert_equal
+from nose.tools import istest, assert_equal, assert_regexp_matches
 
 import sqlexecutor
 
@@ -79,4 +79,4 @@ class MySqlTests(object):
             "",
             "SELECT 1 FROM books"
         )
-        assert_equal("Table 'test.books' doesn't exist", result.error)
+        assert_regexp_matches(result.error, r"Table '\S+.books' doesn't exist")

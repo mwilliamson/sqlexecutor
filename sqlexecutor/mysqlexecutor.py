@@ -45,27 +45,27 @@ class MySqlDialect(object):
                 socket_path=socket_path,
                 root_password="",
             )
-            try:
-                connection = _retry(
-                    lambda: server.connect_as_root(),
-                    MySQLdb.MySQLError,
-                    timeout=10, interval=0.2
-                )
-                try:
-                    root_password = str(uuid.uuid4())
-                    cursor = connection.cursor()
-                    cursor.execute("SET PASSWORD = PASSWORD(%s)", (root_password,))
-                finally:
-                    connection.close()
-                    
-                server._root_password = root_password
-                
-                return server
-            except:
-                server.close()
-                raise
         except:
             temp_dir.close()
+            raise
+        try:
+            connection = _retry(
+                lambda: server.connect_as_root(),
+                MySQLdb.MySQLError,
+                timeout=10, interval=0.2
+            )
+            try:
+                root_password = str(uuid.uuid4())
+                cursor = connection.cursor()
+                cursor.execute("SET PASSWORD = PASSWORD(%s)", (root_password,))
+            finally:
+                connection.close()
+                
+            server._root_password = root_password
+            
+            return server
+        except:
+            server.close()
             raise
     
     def _mysqld_args(self, socket_path, port):
@@ -106,19 +106,38 @@ class MySqlServer(object):
         self._root_password = root_password
 
     def connect(self):
-        return self.connect_as_root()
+        database_name = str(uuid.uuid4()).replace("-", "")[:16]
+        password = str(uuid.uuid4())
+        connection = self.connect_as_root()
+        try:
+            cursor = connection.cursor()
+            cursor.execute("CREATE DATABASE `{0}`".format(database_name))
+            cursor.execute(
+                "GRANT ALL PRIVILEGES ON `{0}`.* TO %s@'localhost' IDENTIFIED BY %s".format(database_name),
+                (database_name, password,)
+            )
+            # TODO: tidy up user
+            return self._connect_as_user(
+                username=database_name,
+                password=password,
+                database=database_name,
+            )
+        finally:
+            connection.close()
 
     def connect_as_root(self):
         return self._connect_as_user("root", self._root_password)
 
-    def _connect_as_user(self, username, password):
-        return MySQLdb.connect(
-            host="localhost",
-            user=username,
-            passwd=self._root_password,
-            db="test",
-            unix_socket=self._socket_path
-        )
+    def _connect_as_user(self, username, password, database=None):
+        connect_kwargs = {
+            "host": "localhost",
+            "user": username,
+            "passwd": password,
+            "unix_socket": self._socket_path,
+        }
+        if database is not None:
+            connect_kwargs["db"] = database
+        return MySQLdb.connect(**connect_kwargs)
         
     def close(self):
         self._process.send_signal(15)
