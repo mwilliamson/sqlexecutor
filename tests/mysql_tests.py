@@ -15,7 +15,7 @@ class MySqlTests(object):
             working_dir_path = cls._working_dir.path
         else:
             cls._working_dir = None
-            working_dir_path = os.path.join(os.path.dirname(__file__), "_working_dir")
+            working_dir_path = os.path.join(os.path.dirname(__file__), "../_tests-working-dir")
         sqlexecutor.prepare("mysql", working_dir=working_dir_path)
         cls._executor = sqlexecutor.executor("mysql", working_dir=working_dir_path)
     

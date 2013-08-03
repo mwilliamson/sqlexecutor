@@ -1,5 +1,5 @@
 /README
 /_virtualenv
 /*.egg-info
-/sqlexecutor/downloads
+/_tests-working-dir
 *.pyc
