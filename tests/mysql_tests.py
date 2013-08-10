@@ -93,4 +93,4 @@ class MySqlTests(object):
             "",
             "SELECT 1 FROM books"
         )
-        assert_regexp_matches(result.error, r"Table '\S+.books' doesn't exist")
+        assert_regexp_matches(result.error, r"Table 'learnsomesql.books' doesn't exist")

@@ -19,9 +19,6 @@ class MySqlDialect(object):
     def __init__(self, working_dir):
         self._working_dir = working_dir
     
-    def error_message(self, error):
-        return error[1]
-    
     def start_server(self):
         temp_dir = create_temporary_dir()
         try:
@@ -130,6 +127,21 @@ class MySqlDialect(object):
         return self._working_dir
 
 
+class MySqlConnection(object):
+    def __init__(self, connection, name):
+        self._connection = connection
+        self._name = name
+    
+    def cursor(self):
+        return self._connection.cursor()
+    
+    def error_message(self, error):
+        return error[1].replace(self._name, "learnsomesql")
+        
+    def close(self):
+        self._connection.close()
+
+
 class MySqlServer(object):
     def __init__(self, process, temp_dir, socket_path, root_password):
         self._process = process
@@ -149,11 +161,11 @@ class MySqlServer(object):
                 (database_name, password,)
             )
             # TODO: tidy up user
-            return self._connect_as_user(
+            return MySqlConnection(self._connect_as_user(
                 username=database_name,
                 password=password,
                 database=database_name,
-            )
+            ), database_name)
         finally:
             connection.close()
 

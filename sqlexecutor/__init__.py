@@ -37,7 +37,7 @@ class QueryExecutor(object):
             try:
                 cursor.execute(query)
             except self._dialect.DatabaseError as error:
-                error_message = self._dialect.error_message(error)
+                error_message = connection.error_message(error)
                 return Result(query=query, error=error_message, table=None)
             
             column_names = [
@@ -70,16 +70,22 @@ class Sqlite3Dialect(object):
     def start_server(self):
         return Sqlite3Server()
         
-    def error_message(self, error):
-        return error.message
-        
     def prepare(self):
         pass
 
 
 class Sqlite3Server(object):
     def connect(self):
-        return sqlite3.connect(":memory:")
+        return Sqlite3Connection(sqlite3.connect(":memory:"))
+
+
+class Sqlite3Connection(object):
+    def __init__(self, connection):
+        self.close = connection.close
+        self.cursor = connection.cursor
+    
+    def error_message(self, error):
+        return error.message
 
 
 _dialects = {
