@@ -18,4 +18,5 @@ setup(
         "spur.local>=0.3.5,<0.4",
         "MySQL-python==1.2.4",
     ],
+    license='BSD 2-Clause',
 )
