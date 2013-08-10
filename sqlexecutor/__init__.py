@@ -1,4 +1,4 @@
-__all__ = ["executor"]
+__all__ = ["prepare", "executor"]
 
 
 import sqlite3
