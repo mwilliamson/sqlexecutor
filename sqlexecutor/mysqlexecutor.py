@@ -118,7 +118,7 @@ class MySqlDialect(object):
         return tarball_path
     
     def _data_dir_template(self):
-        return os.path.join(self._downloads_dir(), "data")
+        return os.path.join(self._downloads_dir(), "data-5.6.13")
     
     def _mysql_install_dir(self):
         return os.path.join(self._downloads_dir(), "mysql-5.6.13")
