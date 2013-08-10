@@ -136,7 +136,7 @@ class MySqlConnection(object):
         return self._connection.cursor()
     
     def error_message(self, error):
-        return error[1].replace(self._name, "learnsomesql")
+        return error[1].replace(self._name, "db")
         
     def close(self):
         self._connection.close()
