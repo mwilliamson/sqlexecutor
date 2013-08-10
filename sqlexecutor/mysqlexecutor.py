@@ -107,7 +107,7 @@ class MySqlDialect(object):
         return install_dir
     
     def _download(self, name, url):
-        tarball_path = os.path.join(self._downloads_dir(), name)
+        tarball_path = os.path.join(self._working_dir, name)
         if not os.path.exists(os.path.dirname(tarball_path)):
             os.makedirs(os.path.dirname(tarball_path))
         
@@ -118,15 +118,12 @@ class MySqlDialect(object):
         return tarball_path
     
     def _data_dir_template(self):
-        return os.path.join(self._downloads_dir(), "data-5.6.13")
+        return os.path.join(self._working_dir, "data-5.6.13")
     
     def _mysql_install_dir(self):
-        return os.path.join(self._downloads_dir(), "mysql-5.6.13")
+        return os.path.join(self._working_dir, "mysql-5.6.13")
+
     
-    def _downloads_dir(self):
-        return self._working_dir
-
-
 class MySqlConnection(object):
     def __init__(self, connection, name):
         self._connection = connection
