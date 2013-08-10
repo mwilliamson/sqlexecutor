@@ -84,6 +84,9 @@ class Sqlite3Dialect(object):
 class Sqlite3Server(object):
     def connect(self):
         return Sqlite3Connection(sqlite3.connect(":memory:"))
+        
+    def close(self):
+        pass
 
 
 class Sqlite3Connection(object):
