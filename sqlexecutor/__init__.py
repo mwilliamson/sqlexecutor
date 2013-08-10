@@ -1,6 +1,7 @@
 __all__ = ["prepare", "executor"]
 
 
+import os
 import sqlite3
 import contextlib
 
@@ -9,14 +10,20 @@ from .results import ResultTable, Result
 
 
 def prepare(name, working_dir):
-    dialect = _dialects[name](working_dir)
+    dialect = _get_dialect(name, working_dir)
     dialect.prepare()
     
 
 def executor(name, working_dir):
-    dialect = _dialects[name](working_dir)
+    dialect = _get_dialect(name, working_dir)
     server = dialect.start_server()
     return QueryExecutor(dialect, server)
+
+
+def _get_dialect(name, working_dir):
+    if working_dir is not None:
+        working_dir = os.path.join(working_dir, name)
+    return _dialects[name](working_dir)
 
 
 class QueryExecutor(object):
