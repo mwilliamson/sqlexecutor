@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name='sqlexecutor',
-    version='0.1.0',
+    version='0.1.1',
     description='Execute SQL queries in an isolated database',
     long_description=read("README"),
     author='Michael Williamson',
