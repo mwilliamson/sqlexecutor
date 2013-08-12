@@ -86,7 +86,6 @@ class MySqlTests(object):
         assert_equal('You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near \'SELECTEROO\' at line 1', result.error)
 
 
-
     @istest
     def query_results_in_error_if_query_references_non_existant_table(self):
         result = self._executor.execute(
@@ -94,3 +93,12 @@ class MySqlTests(object):
             "SELECT 1 FROM books"
         )
         assert_regexp_matches(result.error, r"Table 'db.books' doesn't exist")
+
+
+    @istest
+    def long_queries_result_in_error(self):
+        result = self._executor.execute(
+            "",
+            "SELECT SLEEP(10)"
+        )
+        assert_regexp_matches(result.error, r"The query took too long to finish")

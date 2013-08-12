@@ -3,6 +3,7 @@ import contextlib
 import subprocess
 import time
 import uuid
+import multiprocessing
 
 import MySQLdb
 import spur
@@ -123,7 +124,42 @@ class MySqlDialect(object):
     def _mysql_install_dir(self):
         return os.path.join(self._working_dir, "mysql-5.6.13")
 
+
+class ProcessConnection(object):
+    def __init__(self, process, master_pipe):
+        self._process = process
+        self._master_pipe = master_pipe
+        
+    def cursor(self):
+        return ProcessCursor(self._master_pipe)
+        
+    def error_message(self, error):
+        return None
+        
+    def close(self):
+        if self._process.is_alive():
+            self._process.terminate()
+
+
+class ProcessCursor(object):
+    def __init__(self, master_pipe):
+        self._master_pipe = master_pipe
+        
+    def execute(self, query):
+        self._master_pipe.send(("execute", query))
     
+    @property
+    def description(self):
+        self._master_pipe.send(("description", None))
+        if self._master_pipe.poll(1):
+            return self._master_pipe.recv()
+        
+    def fetchall(self):
+        self._master_pipe.send(("fetchall", None))
+        if self._master_pipe.poll(1):
+            return self._master_pipe.recv()
+
+
 class MySqlConnection(object):
     def __init__(self, connection, name):
         self._connection = connection
@@ -157,14 +193,22 @@ class MySqlServer(object):
                 "GRANT ALL PRIVILEGES ON `{0}`.* TO %s@'localhost' IDENTIFIED BY %s".format(database_name),
                 (database_name, password,)
             )
-            # TODO: tidy up user
-            return MySqlConnection(self._connect_as_user(
-                username=database_name,
-                password=password,
-                database=database_name,
-            ), database_name)
         finally:
             connection.close()
+            
+        # TODO: tidy up user
+        return self._process_connect(database_name, password)
+    
+    def _process_connect(self, database_name, password):
+        master_pipe, slave_pipe = multiprocessing.Pipe()
+        process = multiprocessing.Process(target=_run_queries, kwargs={
+            "database_name": database_name,
+            "password": password,
+            "socket_path": self._socket_path,
+            "pipe": slave_pipe,
+        })
+        process.start()
+        return ProcessConnection(process, master_pipe)
 
     def connect_as_root(self):
         return self._connect_as_user("root", self._root_password)
@@ -184,6 +228,28 @@ class MySqlServer(object):
         self._process.send_signal(15)
         self._process.wait_for_result()
         self._temp_dir.close()
+
+
+def _run_queries(database_name, password, socket_path, pipe):
+    connection = MySQLdb.connect(
+        host="localhost",
+        user=database_name,
+        db=database_name,
+        passwd=password,
+        unix_socket=socket_path,
+    )
+    with connection:
+        cursor = connection.cursor()
+        while True:
+            command, value = pipe.recv()
+            if command == "exit":
+                return
+            elif command == "description":
+                pipe.send(cursor.description)
+            elif command == "execute":
+                cursor.execute(value)
+            elif command == "fetchall":
+                pipe.send(cursor.fetchall())
 
 
 def _retry(func, error_cls, timeout, interval):
