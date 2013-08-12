@@ -6,7 +6,7 @@ import sqlexecutor
 
 
 def main():
-    dialect_name, working_dir, marker = sys.argv[1:]
+    dialect_name, working_dir = sys.argv[1:]
     
     executor = sqlexecutor.executor(dialect_name, working_dir)
     try:

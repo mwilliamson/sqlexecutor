@@ -26,14 +26,12 @@ def executor(name, working_dir):
 def subprocess_executor(name, working_dir):
     script_path = os.path.join(os.path.dirname(__file__), "process.py")
     
-    marker = str(uuid.uuid4())
     process = subprocess.Popen(
         [
             sys.executable,
             script_path,
             name,
             os.path.abspath(working_dir),
-            marker,
         ],
         
         stdout=subprocess.PIPE,
@@ -41,7 +39,7 @@ def subprocess_executor(name, working_dir):
         stdin=subprocess.PIPE,
     )
     
-    return SubprocessQueryExecutor(process, marker)
+    return SubprocessQueryExecutor(process)
 
 
 def _get_dialect(name, working_dir):
@@ -51,9 +49,8 @@ def _get_dialect(name, working_dir):
 
     
 class SubprocessQueryExecutor(object):
-    def __init__(self, process, marker):
+    def __init__(self, process):
         self._process = process
-        self._marker = marker
         self._receiver = msgpack.Unpacker(self._process.stdout, read_size=1)
         
     def execute(self, creation_sql, query):
