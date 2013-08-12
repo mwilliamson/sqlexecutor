@@ -107,20 +107,14 @@ class SubprocessQueryExecutor(object):
         )
         
     def close(self):
-        try:
-            subprocess.check_call(["kill", "--", "-{0}".format(self._process.pid)])
+        subprocess.check_call(["kill", "--", "-{0}".format(self._process.pid)])
+        
+        def really_kill_it():
+            time.sleep(10)
+            subprocess.call(["kill", "-KILL", "--", "-{0}".format(self._process.pid)])
             
-            def really_kill_it():
-                time.sleep(10)
-                subprocess.call(["kill", "-KILL", "--", "-{0}".format(self._process.pid)])
-                
-            thread = threading.Thread(target=really_kill_it)
-            thread.start()
-                
-            
-        except IOError:
-            # Probably already dead
-            pass
+        thread = threading.Thread(target=really_kill_it)
+        thread.start()
         
     def _send_command(self, *args):
         msgpack.dump(args, self._process.stdin)
