@@ -5,6 +5,9 @@ import sys
 import os
 import sqlite3
 import subprocess
+import threading
+import time
+
 import msgpack
 
 from .mysqlexecutor import MySqlDialect
@@ -23,22 +26,7 @@ def executor(name, working_dir):
 
 
 def subprocess_executor(name, working_dir):
-    script_path = os.path.join(os.path.dirname(__file__), "process.py")
-    
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            script_path,
-            name,
-            os.path.abspath(working_dir),
-        ],
-        
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-        stdin=subprocess.PIPE,
-    )
-    
-    return SubprocessQueryExecutor(process)
+    return RestartingSubprocessQueryExecutor(name, working_dir)
 
 
 def _get_dialect(name, working_dir):
@@ -46,7 +34,58 @@ def _get_dialect(name, working_dir):
         working_dir = os.path.join(working_dir, name)
     return _dialects[name](working_dir)
 
+
+class RestartingSubprocessQueryExecutor(object):
+    def __init__(self, dialect_name, working_dir):
+        self._dialect_name = dialect_name
+        self._working_dir = working_dir
+        self._executor = None
+        
+    def execute(self, creation_sql, query):
+        self._start_executor()
+        try:
+            return self._executor.execute(creation_sql, query)
+        except QueryTimeoutException:
+            self._executor.close()
+            self._executor = None
+            return Result(query=query, error="The query took too long to finish", table=None)
     
+    def close(self):
+        if self._executor is not None:
+            self._executor.close()
+        
+    def _start_executor(self):
+        if self._executor is not None:
+            return
+        
+        script_path = os.path.join(os.path.dirname(__file__), "process.py")
+        
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                script_path,
+                self._dialect_name,
+                os.path.abspath(self._working_dir),
+            ],
+            
+            stdout=subprocess.PIPE,
+            stderr=sys.stderr,
+            stdin=subprocess.PIPE,
+            
+            # Create a new process group
+            preexec_fn=os.setpgrp,
+        )
+        try:
+            line = process.stdout.readline()
+            if line != "Ready\n":
+                raise Exception("Could not start executor" + line)
+            
+            self._executor = SubprocessQueryExecutor(process)
+        except:
+            process.terminate()
+            raise
+
+
 class SubprocessQueryExecutor(object):
     def __init__(self, process):
         self._process = process
@@ -69,7 +108,16 @@ class SubprocessQueryExecutor(object):
         
     def close(self):
         try:
-            self._send_command("exit")
+            subprocess.check_call(["kill", "--", "-{0}".format(self._process.pid)])
+            
+            def really_kill_it():
+                time.sleep(10)
+                subprocess.call(["kill", "-KILL", "--", "-{0}".format(self._process.pid)])
+                
+            thread = threading.Thread(target=really_kill_it)
+            thread.start()
+                
+            
         except IOError:
             # Probably already dead
             pass
@@ -79,11 +127,26 @@ class SubprocessQueryExecutor(object):
         self._process.stdin.flush()
         
     def _receive(self):
-        try:
-            return next(self._receiver)
-        except StopIteration:
-            return None
+        result = [None]
         
+        def run():
+            try:
+                result[0] = next(self._receiver)
+            except StopIteration:
+                result[0] = None
+        
+        thread = threading.Thread(target=run)
+        thread.start()
+        thread.join(2)
+        if thread.isAlive():
+            raise QueryTimeoutException()
+        else:
+            return result[0]
+
+
+class QueryTimeoutException(Exception):
+    pass
+    
 
 class QueryExecutor(object):
     def __init__(self, dialect, server):

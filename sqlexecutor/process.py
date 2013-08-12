@@ -9,6 +9,9 @@ def main():
     dialect_name, working_dir = sys.argv[1:]
     
     executor = sqlexecutor.executor(dialect_name, working_dir)
+    
+    print "Ready"
+    sys.stdout.flush()
     try:
         for message in msgpack.Unpacker(sys.stdin, read_size=1):
             command = message[0]
