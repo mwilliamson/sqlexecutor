@@ -17,6 +17,7 @@ setup(
     install_requires=[
         "spur.local>=0.3.5,<0.4",
         "MySQL-python==1.2.4",
+        "msgpack-python==0.3.0",
     ],
     license='BSD 2-Clause',
 )

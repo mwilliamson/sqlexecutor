@@ -1,9 +1,12 @@
 __all__ = ["prepare", "executor"]
 
 
+import sys
 import os
 import sqlite3
-import contextlib
+import uuid
+import subprocess
+import msgpack
 
 from .mysqlexecutor import MySqlDialect
 from .results import ResultTable, Result
@@ -20,11 +23,71 @@ def executor(name, working_dir):
     return QueryExecutor(dialect, server)
 
 
+def subprocess_executor(name, working_dir):
+    script_path = os.path.join(os.path.dirname(__file__), "process.py")
+    
+    marker = str(uuid.uuid4())
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            script_path,
+            name,
+            os.path.abspath(working_dir),
+            marker,
+        ],
+        
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+        stdin=subprocess.PIPE,
+    )
+    
+    return SubprocessQueryExecutor(process, marker)
+
+
 def _get_dialect(name, working_dir):
     if working_dir is not None:
         working_dir = os.path.join(working_dir, name)
     return _dialects[name](working_dir)
 
+    
+class SubprocessQueryExecutor(object):
+    def __init__(self, process, marker):
+        self._process = process
+        self._marker = marker
+        self._receiver = msgpack.Unpacker(self._process.stdout, read_size=1)
+        
+    def execute(self, creation_sql, query):
+        self._send_command("execute", creation_sql, query)
+        (error, column_names, rows) = self._receive()
+        
+        if column_names is None:
+            table = None
+        else:
+            table = ResultTable(column_names, rows)
+        
+        return Result(
+            query=query,
+            error=error,
+            table=table
+        )
+        
+    def close(self):
+        try:
+            self._send_command("exit")
+        except IOError:
+            # Probably already dead
+            pass
+        
+    def _send_command(self, *args):
+        msgpack.dump(args, self._process.stdin)
+        self._process.stdin.flush()
+        
+    def _receive(self):
+        try:
+            return next(self._receiver)
+        except StopIteration:
+            return None
+        
 
 class QueryExecutor(object):
     def __init__(self, dialect, server):
@@ -102,3 +165,4 @@ _dialects = {
     "sqlite3": Sqlite3Dialect,
     "mysql": MySqlDialect,
 }
+    
