@@ -4,7 +4,6 @@ __all__ = ["prepare", "executor"]
 import sys
 import os
 import sqlite3
-import uuid
 import subprocess
 import msgpack
 

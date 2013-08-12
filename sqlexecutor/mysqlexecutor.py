@@ -1,5 +1,4 @@
 import os
-import contextlib
 import subprocess
 import time
 import uuid
@@ -7,7 +6,6 @@ import uuid
 import MySQLdb
 import spur
 
-from .results import ResultTable, Result
 from .tempdir import create_temporary_dir
 
 
@@ -191,7 +189,7 @@ def _retry(func, error_cls, timeout, interval):
     while True:
         try:
             return func()
-        except error_cls as error:
+        except error_cls:
             if time.time() - start_time > timeout:
                 raise
             else:

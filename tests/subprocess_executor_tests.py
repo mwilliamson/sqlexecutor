@@ -3,7 +3,6 @@ import os
 from nose.tools import istest, assert_equal, assert_regexp_matches
 
 import sqlexecutor
-from sqlexecutor import tempdir
 
 import mysql_tests
 
